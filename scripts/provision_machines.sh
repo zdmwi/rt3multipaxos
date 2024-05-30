@@ -10,7 +10,6 @@ COMPUTE_MACHINE_TYPE="e2-standard-2"
 COMPUTE_IMAGE_PROJECT="ubuntu-os-cloud"
 COMPUTE_IMAGE_FAMILY="ubuntu-2204-lts"
 COMPUTE_STARTUP_SCRIPT="scripts/startup.sh"
-COMPUTE_DRIVER_STARTUP_SCRIPT="scripts/driver-startup.sh"
 
 # maybe teardown previous filestore instance?
 NUM_STEPS=4
@@ -24,7 +23,6 @@ gcloud compute instances create vm00 \
     --machine-type=${COMPUTE_MACHINE_TYPE} \
     --image-project=${COMPUTE_IMAGE_PROJECT} \
     --image-family=${COMPUTE_IMAGE_FAMILY} \
-    --metadata-from-file=startup-script=${COMPUTE_STARTUP_SCRIPT} \
 
 # create the participating nodes
 gcloud compute instances bulk create \
@@ -34,21 +32,35 @@ gcloud compute instances bulk create \
     --machine-type=${COMPUTE_MACHINE_TYPE} \
     --image-project=${COMPUTE_IMAGE_PROJECT} \
     --image-family=${COMPUTE_IMAGE_FAMILY} \
-    --metadata-from-file=startup-script=${COMPUTE_STARTUP_SCRIPT} \
 
 echo "Step 2/${NUM_STEPS}: Sending configuration to client..."
-sleep 20
+sleep 30
 gcloud compute scp config/gcs_config.json vm00:
 
 echo "Step 3/${NUM_STEPS}: Starting binaries across machines..."
 for num in $( seq 1 $COMPUTE_COUNT)
 do
     SERVER_ID="vm$(printf %02d $num)"
-    gcloud compute ssh ${SERVER_ID} --command="git clone https://github.com/zdmwi/rt3multipaxos.git && cd rt3multipaxos/scripts && ./build.sh && cd .. && bin/server -id ${SERVER_ID} -algorithm=paxos"
+    gcloud compute scp scripts/startup.sh ${SERVER_ID}:
+    gcloud compute ssh ${SERVER_ID} --command="chmod +x startup.sh \
+        && ./startup.sh \
+        && source ~/.bash_profile \
+        && git clone https://github.com/zdmwi/rt3multipaxos.git \
+        && cd rt3multipaxos/scripts \
+        && ./build.sh \
+        && cd .. && bin/server -id ${SERVER_ID} -algorithm=paxos"
 
 done
 
 echo "Step 4/${NUM_STEPS}: Starting client binary..."
-gcloud compute ssh vm00 --command="git clone https://github.com/zdmwi/rt3multipaxos.git && cd rt3multipaxos/scripts && ./build.sh && cd .. && bin/client -id vm00 -config gcs_config.json"
+gcloud compute scp scripts/startup.sh vm00:
+gcloud compute ssh vm00 --command="chmod +x startup.sh \
+    && ./startup.sh \
+    && source ~/.bash_profile \
+    && git clone https://github.com/zdmwi/rt3multipaxos.git \
+    && cd rt3multipaxos/scripts \
+    && ./build.sh \
+    && cd .. \
+    && bin/client -id vm00 -config ~/gcs_config.json"
 
 echo "FINISHED!"
