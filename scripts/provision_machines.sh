@@ -25,37 +25,30 @@ gcloud compute instances create vm00 \
     --image-project=${COMPUTE_IMAGE_PROJECT} \
     --image-family=${COMPUTE_IMAGE_FAMILY} \
     --metadata-from-file=startup-script=${COMPUTE_STARTUP_SCRIPT} \
-    --metadata=filestore-ip=${FILESTORE_IP_ADDRESS}
 
 # create the participating nodes
 gcloud compute instances bulk create \
     --name-pattern=${COMPUTE_NAME_PATTERN} \
-    --zone=${ZONE} \
     --count=${COMPUTE_COUNT} \
+    --zone=${ZONE} \
     --machine-type=${COMPUTE_MACHINE_TYPE} \
     --image-project=${COMPUTE_IMAGE_PROJECT} \
     --image-family=${COMPUTE_IMAGE_FAMILY} \
     --metadata-from-file=startup-script=${COMPUTE_STARTUP_SCRIPT} \
-    --metadata=filestore-ip=${FILESTORE_IP_ADDRESS}
 
-echo "Step 2/${NUM_STEPS}: Deploying binaries to machines..."
-
+echo "Step 2/${NUM_STEPS}: Sending configuration to client..."
 sleep 20
-
-gcloud compute scp bin/client config/gcs_config.json vm00:
-for num in $( seq 1 $COMPUTE_COUNT)
-do
-    gcloud compute scp bin/server vm$(printf %02d $num):
-done
+gcloud compute scp config/gcs_config.json vm00:
 
 echo "Step 3/${NUM_STEPS}: Starting binaries across machines..."
 for num in $( seq 1 $COMPUTE_COUNT)
 do
     SERVER_ID="vm$(printf %02d $num)"
-    gcloud compute ssh ${SERVER_ID} --command="./server -id ${SERVER_ID} -algorithm=paxos"
+    gcloud compute ssh ${SERVER_ID} --command="git clone https://github.com/zdmwi/rt3multipaxos.git && cd rt3multipaxos/scripts && ./build.sh && cd .. && bin/server -id ${SERVER_ID} -algorithm=paxos"
+
 done
 
 echo "Step 4/${NUM_STEPS}: Starting client binary..."
-gcloud compute ssh vm00 --command="./client -id vm00 -config gcs_config.json"
+gcloud compute ssh vm00 --command="git clone https://github.com/zdmwi/rt3multipaxos.git && cd rt3multipaxos/scripts && ./build.sh && cd .. && bin/client -id vm00 -config gcs_config.json"
 
 echo "FINISHED!"
