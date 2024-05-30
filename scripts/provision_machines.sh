@@ -35,20 +35,20 @@ gcloud compute instances bulk create \
 
 echo "Step 2/${NUM_STEPS}: Sending configuration to client..."
 sleep 30
-gcloud compute scp scripts/gcs_config.json vm00:
+gcloud compute scp scripts/config.json vm00:
 
 echo "Step 3/${NUM_STEPS}: Starting binaries across machines..."
 for num in $( seq 1 $COMPUTE_COUNT)
 do
     SERVER_ID="vm$(printf %02d $num)"
-    gcloud compute scp scripts/startup.sh ${SERVER_ID}:
+    gcloud compute scp scripts/startup.sh scripts/config.json ${SERVER_ID}:
     gcloud compute ssh ${SERVER_ID} --command="chmod +x startup.sh \
         && ./startup.sh \
         && source ~/.bash_profile \
         && git clone https://github.com/zdmwi/rt3multipaxos.git \
         && cd rt3multipaxos/scripts \
         && ./build.sh \
-        && cd .. && bin/server -id ${SERVER_ID} -algorithm=paxos"
+        && cd .. && bin/server -id ${SERVER_ID} -config ~/config.json -algorithm=paxos"
 
 done
 
@@ -61,6 +61,6 @@ gcloud compute ssh vm00 --command="chmod +x startup.sh \
     && cd rt3multipaxos/scripts \
     && ./build.sh \
     && cd .. \
-    && bin/client -id vm00 -config ~/gcs_config.json"
+    && bin/client -id vm00 -config ~/config.json"
 
 echo "FINISHED!"
