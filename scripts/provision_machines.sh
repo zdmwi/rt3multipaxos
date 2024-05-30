@@ -35,7 +35,7 @@ gcloud compute instances bulk create \
 
 echo "Step 2/${NUM_STEPS}: Sending configuration to client..."
 sleep 30
-gcloud compute scp config/gcs_config.json vm00:
+gcloud compute scp scripts/gcs_config.json vm00:
 
 echo "Step 3/${NUM_STEPS}: Starting binaries across machines..."
 for num in $( seq 1 $COMPUTE_COUNT)
